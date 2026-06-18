@@ -46,3 +46,24 @@ models:
       - name: student_name
         tests:
           - not_null
+  - name: school_access_rates
+    columns:
+      - name: school_name
+        tests:
+          - unique
+          - not_null
+      - name: total_students
+        tests:
+          - not_null
+      - name: students_with_any_access
+        tests:
+          - not_null
+      - name: total_activities_sent
+        tests:
+          - not_null
+      - name: total_activities_accessed
+        tests:
+          - not_null
+      - name: school_access_rate_pct
+        tests:
+          - not_null
