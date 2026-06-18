@@ -6,3 +6,6 @@ sources:
           - name: messages
             identifier: messages
             description: This has the raw messages data from the TAP buddy
+          - name: contacts
+            identifier: contacts
+            description: This has the raw contacts data from the TAP buddy
