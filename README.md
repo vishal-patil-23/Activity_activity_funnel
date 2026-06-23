@@ -149,11 +149,56 @@ dbt build --select tag:activity_funnel
 
 Warehouse output:
 
-| Layer | BigQuery dataset |
-|-------|------------------|
-| Bronze | `Activity_Funnel_bronze` |
-| Silver | `Activity_Funnel_silver` |
-| Gold | `Activity_Funnel_gold` |
+| Layer | BigQuery dataset | Example table |
+|-------|------------------|---------------|
+| Bronze | `Activity_Funnel_bronze` | `glific_contacts` |
+| Silver | `Activity_Funnel_silver` | `student_access_rates` |
+| Gold | `Activity_Funnel_gold` | `school_access_rates` |
+
+### BigQuery dataset naming — कुठून येतं आणि कशासाठी?
+
+**कुठून येतं (how it is created)**
+
+1. `~/.dbt/profiles.yml` (किंवा GitHub Actions secret) मध्ये base dataset सेट असतो:
+   ```yaml
+   dataset: Activity_Funnel
+   ```
+2. `dbt_project.yml` मध्ये प्रत्येक folder ला schema दिला आहे:
+   ```yaml
+   bronze: +schema: bronze
+   silver: +schema: silver
+   gold:   +schema: gold
+   ```
+3. dbt हे दोन जोडून BigQuery **dataset** नाव तयार करतो:
+   ```
+   {profiles dataset}_{folder schema}
+   ```
+   म्हणजे `Activity_Funnel` + `bronze` → `Activity_Funnel_bronze`
+
+**कशासाठी (why we use this)**
+
+| Dataset | Use |
+|---------|-----|
+| `Activity_Funnel_bronze` | Raw Glific data ची copy/extract — source जवळ, फक्त basic clean |
+| `Activity_Funnel_silver` | Filters, joins, business logic — analysis साठी ready data |
+| `Activity_Funnel_gold` | Final dashboard/report tables — demo Activity Funnel output |
+
+**उदाहरण:** Weekly sync नंतर BigQuery मध्ये तुम्हाला असे दिसेल:
+
+```
+central-phalanx-297915
+├── Activity_Funnel_bronze
+│   ├── glific_contacts
+│   └── glific_messages
+├── Activity_Funnel_silver
+│   ├── student_contacts
+│   ├── total_activities
+│   └── ... (6 tables)
+└── Activity_Funnel_gold
+    └── school_access_rates
+```
+
+Dashboard किंवा Looker Studio साठी **`Activity_Funnel_gold.school_access_rates`** direct query करता येतो. Silver/Bronze debugging आणि data lineage साठी वापरले जातात.
 
 ## Weekly sync (GitHub Actions)
 
@@ -206,4 +251,4 @@ tap/
 └── requirements.txt
 ```
 
-Warehouse tables map to medallion datasets: `Activity_Funnel_bronze`, `Activity_Funnel_silver`, `Activity_Funnel_gold`.
+`Activity_Funnel_bronze`, `Activity_Funnel_silver`, `Activity_Funnel_gold` ही नावे `profiles.yml` मधील base dataset + `dbt_project.yml` मधील layer schema मधून तयार होतात (वर तपशील).
