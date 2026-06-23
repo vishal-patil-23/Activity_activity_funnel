@@ -1,5 +1,6 @@
 {{ config(
-    materialized = "incremental"
+    materialized = "incremental",
+    unique_key = ["contact_phone", "flow_label", "inserted_at"]
 ) }}
 
 SELECT
@@ -17,7 +18,10 @@ WHERE
 {% if is_incremental() %}
 AND inserted_at > (
     SELECT
-        MAX(inserted_at)
+        COALESCE(
+            MAX(inserted_at),
+            DATETIME('1970-01-01')
+        )
     FROM
         {{ this }}
 )

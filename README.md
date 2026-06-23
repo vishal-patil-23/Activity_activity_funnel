@@ -62,27 +62,39 @@ Do not run warehouse commands during local development unless you have approved 
 
 All models are tagged `activity_funnel`. Warehouse runs build tables into the **Activity_Funnel** dataset family using medallion layers.
 
+### Incremental sync — raw data full scan नाही
+
+Weekly run वेळी **फक्त नवीन/updated data** scan होतो. प्रत्येक layer मध्ये watermark (`updated_at`, `inserted_at`, `message_inserted_at`, `refreshed_at`) वापरून पुढच्या run साठी filter लावला जातो.
+
+| Layer | Strategy | Raw scan? |
+|-------|----------|-----------|
+| **Bronze** | Source वर `inserted_at` / `updated_at > MAX(...)` filter | फक्त नवीन rows |
+| **Silver** | Bronze मधून delta rows + फक्त बदललेले phones/schools recompute | Bronze delta only |
+| **Gold** | Silver `student_access_rates` वरून सर्व schools rollup (raw scan नाही) | Silver only |
+
+पहिला run (full load): सर्व tables create होतात. पुढचे weekly runs: MERGE/upsert — जुना data पुन्हा source मधून scan होत नाही.
+
 ### Bronze — raw extract
 
 Source data च्या जवळ, minimal cleaning. Dataset: `Activity_Funnel_bronze`
 
 | Model | Source | Type | Purpose |
 |-------|--------|------|---------|
-| `glific_contacts` | `glific.contacts` | Incremental | Contacts extract; dedupe by phone |
-| `glific_messages` | `glific.messages` | Incremental | Messages extract by `contact_phone`, `flow_label`, `inserted_at` |
+| `glific_contacts` | `glific.contacts` | Incremental | `updated_at` watermark; dedupe by phone |
+| `glific_messages` | `glific.messages` | Incremental | `inserted_at` watermark; MERGE on phone + flow + time |
 
 ### Silver — cleaned & transformed
 
 Business logic, joins, filters. Dataset: `Activity_Funnel_silver`
 
-| Model | Depends on | Purpose |
-|-------|------------|---------|
-| `student_contacts` | `glific_contacts` | TLM25 students with school name (test phones excluded) |
-| `total_activities` | `glific_messages` | Activity flow labels for Jul 2025–Jun 2026 |
-| `activity_catalog` | `total_activities` | Sent activities only (no access/submission/complete) |
-| `activity` | `activity_catalog` | Total activities sent per student |
-| `student_access` | `student_contacts`, `total_activities` | Activities accessed per student |
-| `student_access_rates` | `student_access`, `activity` | Per-student access rate |
+| Model | Depends on | Type | Purpose |
+|-------|------------|------|---------|
+| `student_contacts` | `glific_contacts` | Incremental | TLM25 students; फक्त `updated_at` बदललेले contacts |
+| `total_activities` | `glific_messages` | Incremental | फक्त नवीन messages मधून activity flows |
+| `activity_catalog` | `total_activities` | Incremental | नवीन/changed flows मधून sent activities |
+| `activity` | `activity_catalog` | Incremental | फक्त बदललेल्या phones साठी count recompute |
+| `student_access` | `student_contacts`, `total_activities` | Incremental | फक्त touched phones साठी access recompute |
+| `student_access_rates` | `student_access`, `activity` | Incremental | फक्त touched phones साठी rate update |
 
 ### Gold — analytics & reporting
 
@@ -90,7 +102,7 @@ Final metrics for dashboards. Dataset: `Activity_Funnel_gold`
 
 | Model | Depends on | Purpose |
 |-------|------------|---------|
-| `school_access_rates` | `student_access_rates` | School-level rollup; top 50 schools by access rate |
+| `school_access_rates` | `student_access_rates` | School-level rollup; सर्व schools by access rate |
 
 ### Layer flow
 

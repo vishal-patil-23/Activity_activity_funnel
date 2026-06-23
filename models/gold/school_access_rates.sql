@@ -1,3 +1,7 @@
+{{ config(
+    materialized = "table"
+) }}
+
 SELECT
     school_name,
     COUNT(*) AS total_students,
@@ -15,4 +19,3 @@ ORDER BY
     school_access_rate_pct DESC,
     students_with_any_access DESC,
     total_students DESC
-LIMIT 50

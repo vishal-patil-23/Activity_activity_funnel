@@ -1,6 +1,12 @@
+{{ config(
+    materialized = "incremental",
+    unique_key = "phone"
+) }}
+
 SELECT
     phone,
-    JSON_VALUE(raw_fields, '$.school.value') AS school_name
+    JSON_VALUE(raw_fields, '$.school.value') AS school_name,
+    updated_at
 FROM
     {{ ref('glific_contacts') }}
 WHERE
@@ -19,3 +25,15 @@ WHERE
         '917620648785',
         '919999891797'
     )
+
+{% if is_incremental() %}
+AND updated_at > (
+    SELECT
+        COALESCE(
+            MAX(updated_at),
+            DATETIME('1970-01-01')
+        )
+    FROM
+        {{ this }}
+)
+{% endif %}
