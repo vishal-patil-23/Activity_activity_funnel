@@ -5,7 +5,7 @@
 
 WITH source_contacts AS (
     SELECT
-        phone,
+        {{ normalize_phone('phone') }} AS phone,
         group_labels,
         raw_fields,
         inserted_at,

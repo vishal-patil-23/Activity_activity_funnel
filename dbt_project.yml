@@ -5,6 +5,7 @@ config-version: 2
 profile: 'tap'
 
 model-paths: ["models"]
+macro-paths: ["macros"]
 
 clean-targets:
   - "target"

@@ -4,7 +4,7 @@
 ) }}
 
 SELECT
-    contact_phone,
+    {{ normalize_phone('contact_phone') }} AS contact_phone,
     flow_label,
     inserted_at
 FROM

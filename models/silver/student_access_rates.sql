@@ -48,7 +48,10 @@ SELECT
         a.total_activity,
         0
     ) AS total_activity,
-    SAFE_DIVIDE(sa.activities_accessed, a.total_activity) AS student_access_rate,
+    CASE
+        WHEN COALESCE(a.total_activity, 0) = 0 THEN NULL
+        ELSE CAST(sa.activities_accessed AS FLOAT64) / a.total_activity
+    END AS student_access_rate,
     GREATEST(
         sa.refreshed_at,
         COALESCE(a.refreshed_at, DATETIME('1970-01-01'))

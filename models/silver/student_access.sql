@@ -51,7 +51,7 @@ SELECT
         DISTINCT CASE
             WHEN REGEXP_CONTAINS(
                 ta.flow_label,
-                r'activity_access'
+                r'(?i)activity_access'
             ) THEN ta.flow_label
         END
     ) AS activities_accessed,
