@@ -1,7 +1,7 @@
 sources:
     - name: glific
       description: Tables here have the TAP glific bigquery data
-      schema: "918454812392"
+      schema: "MEL_2025_26"
       tables:
           - name: messages
             identifier: messages
