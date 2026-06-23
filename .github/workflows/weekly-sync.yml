@@ -13,7 +13,7 @@ concurrency:
 jobs:
   dbt-sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
@@ -51,7 +51,7 @@ jobs:
                 type: bigquery
                 method: service-account
                 project: ${BQ_PROJECT}
-                dataset: ${BQ_DATASET:-MEL_2025_26}
+                dataset: ${BQ_DATASET:-Activity_Funnel}
                 keyfile: ${RUNNER_TEMP}/gcp-key.json
                 location: US
                 threads: 4
@@ -60,8 +60,5 @@ jobs:
       - name: Install dbt packages
         run: dbt deps
 
-      - name: Run school access pipeline
-        run: dbt run --select +school_access_rates
-
-      - name: Test school access pipeline
-        run: dbt test --select school_access_rates
+      - name: Build Activity Funnel pipeline
+        run: dbt build --select tag:activity_funnel

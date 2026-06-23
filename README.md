@@ -1,6 +1,6 @@
-# tap — BigQuery analytics pipeline
+# tap — Activity Funnel (BigQuery)
 
-dbt-core project for TAP school activity access reporting on BigQuery.
+dbt-core project for TAP activity funnel analytics on BigQuery. Warehouse runs materialize all models into the **Activity_Funnel** demo dataset.
 
 ## Prerequisites
 
@@ -46,7 +46,7 @@ For day-to-day work on models, macros, and tests, use **local validation only**.
 
 ```bash
 dbt parse
-dbt compile --select +school_access_rates
+dbt compile --select tag:activity_funnel
 ```
 
 The following commands **execute against BigQuery** and should only be run when you explicitly intend to build or test in the warehouse (e.g. scheduled jobs, approved manual runs):
@@ -61,35 +61,38 @@ The following commands **execute against BigQuery** and should only be run when 
 
 Do not run warehouse commands during local development unless you have approved access and intend to materialize results.
 
-## School access rate pipeline
+## Activity Funnel pipeline
 
-Your SQL query is split into layered dbt models:
+All models are tagged `activity_funnel`. Warehouse runs build the full funnel into BigQuery:
 
-| Layer | Model | Purpose |
-|-------|-------|---------|
-| Source | `glific.contacts`, `glific.messages` | Raw BigQuery tables |
-| Intermediate | `glific_contacts` | Incremental contact extract |
-| Intermediate | `glific_messages` | Incremental message extract |
-| Intermediate | `student_contacts` | Filtered TLM25 students with school name |
-| Intermediate | `total_activities` | Activity flow labels (Jul 2025–Jun 2026) |
-| Intermediate | `activity_catalog` | Activities excluding access/submission/complete |
-| Intermediate | `activity` | Total activities sent per student |
-| Intermediate | `student_access` | Activities accessed per student |
-| Intermediate | `student_access_rates` | Per-student access rate |
-| Prod | `school_access_rates` | Final school-level rollup (top 50 schools) |
+| Layer | Dataset | Models |
+|-------|---------|--------|
+| Source | `918454812392` | `contacts`, `messages` (read-only) |
+| Intermediate | `Activity_Funnel_intermediate` | `glific_contacts`, `glific_messages`, `student_contacts`, `total_activities`, `activity_catalog`, `activity`, `student_access`, `student_access_rates` |
+| Prod | `Activity_Funnel` | `school_access_rates` |
+
+### Model flow
+
+```
+glific.contacts ──► glific_contacts ──► student_contacts ──┐
+glific.messages ──► glific_messages ──► total_activities ──┼──► student_access ──► student_access_rates ──► school_access_rates
+                          │                                 │
+                          └──► activity_catalog ──► activity ┘
+```
 
 Validate locally (no BigQuery):
 
 ```bash
-dbt compile --select +school_access_rates
+dbt compile --select tag:activity_funnel
 ```
 
 Run in BigQuery (approved warehouse runs only):
 
 ```bash
-dbt run --select +school_access_rates
-dbt test --select school_access_rates
+dbt build --select tag:activity_funnel
 ```
+
+This creates/updates all Activity Funnel tables in the `Activity_Funnel` dataset family.
 
 ## Weekly sync (GitHub Actions)
 
@@ -98,8 +101,9 @@ The pipeline runs automatically every **Sunday at 12:05 AM IST** (Saturday 18:35
 It runs:
 
 1. `dbt deps`
-2. `dbt run --select +school_access_rates`
-3. `dbt test --select school_access_rates`
+2. `dbt build --select tag:activity_funnel` (all Activity Funnel models + tests)
+
+Output lands in BigQuery dataset **`Activity_Funnel`** (prod) and **`Activity_Funnel_intermediate`** (intermediate models).
 
 ### One-time GitHub setup
 
@@ -109,7 +113,7 @@ Add these repository secrets in GitHub → **Settings → Secrets and variables 
 |--------|-------|
 | `GCP_SA_KEY` | Full JSON contents of the BigQuery service account key |
 | `BQ_PROJECT` | `central-phalanx-297915` |
-| `BQ_DATASET` | `MEL_2025_26` (optional; defaults to this value) |
+| `BQ_DATASET` | `Activity_Funnel` (optional; defaults to this value) |
 
 Trigger a run manually from **Actions → Weekly TAP sync → Run workflow**.
 
@@ -133,15 +137,13 @@ Remote: https://github.com/vishal-patil-23/tap
 
 ```
 tap/
-├── dbt_project.yml          # Project config (profile: tap)
+├── dbt_project.yml          # Project config (profile: tap, tag: activity_funnel)
 ├── models/
 │   ├── staging/glific-bigquery/   # Source definitions
 │   ├── intermediate/glific/       # Transformation models
-│   ├── intermediate/crm/          # CRM models
 │   └── prod/                      # Final reporting tables
-├── macros/
 ├── tests/
 └── packages.yml
 ```
 
-Built tables use dbt's default schema naming from your `profiles.yml` target and per-model `schema` config.
+Warehouse tables use dbt default schema naming: prod models in `Activity_Funnel`, intermediate models in `Activity_Funnel_intermediate`.
