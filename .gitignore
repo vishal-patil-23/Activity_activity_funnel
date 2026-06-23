@@ -9,3 +9,4 @@ profiles.yml
 *.json
 venv/
 .env
+dbt_internal_packages/

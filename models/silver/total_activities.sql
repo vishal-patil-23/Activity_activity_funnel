@@ -6,7 +6,7 @@
 SELECT
     contact_phone,
     flow_label,
-    MAX(inserted_at) AS message_inserted_at
+    {# MAX(inserted_at) AS message_inserted_at #}
 FROM
     {{ ref('glific_messages') }}
 WHERE
