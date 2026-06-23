@@ -1,0 +1,67 @@
+name: Weekly TAP sync
+
+on:
+  schedule:
+    # Every Monday at 03:30 UTC (09:00 IST)
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: tap-weekly-sync
+  cancel-in-progress: false
+
+jobs:
+  dbt-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure dbt profile
+        env:
+          BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET: ${{ secrets.BQ_DATASET }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "GCP_SA_KEY secret is not set."
+            exit 1
+          fi
+
+          echo "$GCP_SA_KEY" > "${RUNNER_TEMP}/gcp-key.json"
+
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml <<EOF
+          tap:
+            target: prod
+            outputs:
+              prod:
+                type: bigquery
+                method: service-account
+                project: ${BQ_PROJECT}
+                dataset: ${BQ_DATASET:-MEL_2025_26}
+                keyfile: ${RUNNER_TEMP}/gcp-key.json
+                location: US
+                threads: 4
+          EOF
+
+      - name: Install dbt packages
+        run: dbt deps
+
+      - name: Run school access pipeline
+        run: dbt run --select +school_access_rates
+
+      - name: Test school access pipeline
+        run: dbt test --select school_access_rates

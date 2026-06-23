@@ -40,11 +40,26 @@ tap:
       threads: 4
 ```
 
-Verify the connection:
+## Local development (no BigQuery execution)
+
+For day-to-day work on models, macros, and tests, use **local validation only**. These commands compile and check the project on your machine without running queries or writing tables in BigQuery:
 
 ```bash
-dbt debug
+dbt parse
+dbt compile --select +school_access_rates
 ```
+
+The following commands **execute against BigQuery** and should only be run when you explicitly intend to build or test in the warehouse (e.g. scheduled jobs, approved manual runs):
+
+| Command | Effect |
+|---------|--------|
+| `dbt debug` | Tests live BigQuery connection |
+| `dbt run` | Creates/updates tables and views |
+| `dbt test` | Runs data quality checks in BigQuery |
+| `dbt build` | Runs models and tests |
+| `dbt seed` / `dbt snapshot` | Writes data to BigQuery |
+
+Do not run warehouse commands during local development unless you have approved access and intend to materialize results.
 
 ## School access rate pipeline
 
@@ -63,17 +78,40 @@ Your SQL query is split into layered dbt models:
 | Intermediate | `student_access_rates` | Per-student access rate |
 | Prod | `school_access_rates` | Final school-level rollup (top 50 schools) |
 
-Run only the school access pipeline:
+Validate locally (no BigQuery):
+
+```bash
+dbt compile --select +school_access_rates
+```
+
+Run in BigQuery (approved warehouse runs only):
 
 ```bash
 dbt run --select +school_access_rates
-```
-
-Run tests:
-
-```bash
 dbt test --select school_access_rates
 ```
+
+## Weekly sync (GitHub Actions)
+
+The pipeline runs automatically every **Monday at 09:00 IST** (03:30 UTC) via `.github/workflows/weekly-sync.yml`.
+
+It runs:
+
+1. `dbt deps`
+2. `dbt run --select +school_access_rates`
+3. `dbt test --select school_access_rates`
+
+### One-time GitHub setup
+
+Add these repository secrets in GitHub → **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|--------|-------|
+| `GCP_SA_KEY` | Full JSON contents of the BigQuery service account key |
+| `BQ_PROJECT` | `central-phalanx-297915` |
+| `BQ_DATASET` | `MEL_2025_26` (optional; defaults to this value) |
+
+Trigger a run manually from **Actions → Weekly TAP sync → Run workflow**.
 
 ## Git workflow
 
@@ -106,4 +144,4 @@ tap/
 └── packages.yml
 ```
 
-Built tables land in BigQuery datasets prefixed with `dalgo_` (see `macros/generate_schema_name.sql`).
+Built tables use dbt's default schema naming from your `profiles.yml` target and per-model `schema` config.
