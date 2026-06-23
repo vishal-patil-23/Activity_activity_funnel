@@ -60,6 +60,3 @@ tap/
 │   └── gold/
 └── requirements.txt
 ```
-
-`Activity_Funnel_bronze`, `Activity_Funnel_silver`, `Activity_Funnel_gold` ही नावे `profiles.yml` मधील base dataset + `dbt_project.yml` मधील layer schema मधून तयार होतात (वर तपशील).
-# Activity_activity_funnel
