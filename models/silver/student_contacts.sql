@@ -1,8 +1,3 @@
-{{ config(
-    materialized = "table",
-    schema = "intermediate"
-) }}
-
 SELECT
     phone,
     JSON_VALUE(raw_fields, '$.school.value') AS school_name

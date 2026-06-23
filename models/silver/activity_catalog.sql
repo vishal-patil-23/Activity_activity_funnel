@@ -1,8 +1,3 @@
-{{ config(
-    materialized = "table",
-    schema = "intermediate"
-) }}
-
 SELECT DISTINCT
     contact_phone,
     flow_label

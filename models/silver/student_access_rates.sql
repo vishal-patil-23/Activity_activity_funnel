@@ -1,8 +1,3 @@
-{{ config(
-    materialized = "table",
-    schema = "intermediate"
-) }}
-
 SELECT
     sa.phone,
     sa.school_name,

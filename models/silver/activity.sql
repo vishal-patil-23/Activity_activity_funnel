@@ -1,8 +1,3 @@
-{{ config(
-    materialized = "table",
-    schema = "intermediate"
-) }}
-
 SELECT
     contact_phone,
     COUNT(*) AS total_activity

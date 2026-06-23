@@ -57,8 +57,5 @@ jobs:
                 threads: 4
           EOF
 
-      - name: Install dbt packages
-        run: dbt deps
-
       - name: Build Activity Funnel pipeline
         run: dbt build --select tag:activity_funnel

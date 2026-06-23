@@ -1,6 +1,5 @@
 {{ config(
-    materialized = "incremental",
-    schema = "intermediate"
+    materialized = "incremental"
 ) }}
 
 SELECT

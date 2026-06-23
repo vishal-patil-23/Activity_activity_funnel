@@ -1,6 +1,5 @@
 {{ config(
     materialized = "incremental",
-    schema = "intermediate",
     unique_key = "phone"
 ) }}
 

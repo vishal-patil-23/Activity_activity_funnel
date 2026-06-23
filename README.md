@@ -19,9 +19,6 @@ cd tap
 python -m venv .dbtenv
 source .dbtenv/bin/activate
 pip install -r requirements.txt
-
-# Install dbt packages
-dbt deps
 ```
 
 Configure BigQuery credentials in `~/.dbt/profiles.yml`:
@@ -61,29 +58,87 @@ The following commands **execute against BigQuery** and should only be run when 
 
 Do not run warehouse commands during local development unless you have approved access and intend to materialize results.
 
-## Activity Funnel pipeline
+## Activity Funnel pipeline (Bronze → Silver → Gold)
 
-All models are tagged `activity_funnel`. Warehouse runs build the full funnel into BigQuery:
+All models are tagged `activity_funnel`. Warehouse runs build tables into the **Activity_Funnel** dataset family using medallion layers.
 
-| Layer | Dataset | Models |
-|-------|---------|--------|
-| Source | `918454812392` | `contacts`, `messages` (read-only) |
-| Intermediate | `Activity_Funnel_intermediate` | `glific_contacts`, `glific_messages`, `student_contacts`, `total_activities`, `activity_catalog`, `activity`, `student_access`, `student_access_rates` |
-| Prod | `Activity_Funnel` | `school_access_rates` |
+### Bronze — raw extract
 
-### Model flow
+Source data च्या जवळ, minimal cleaning. Dataset: `Activity_Funnel_bronze`
 
-```
-glific.contacts ──► glific_contacts ──► student_contacts ──┐
-glific.messages ──► glific_messages ──► total_activities ──┼──► student_access ──► student_access_rates ──► school_access_rates
-                          │                                 │
-                          └──► activity_catalog ──► activity ┘
+| Model | Source | Type | Purpose |
+|-------|--------|------|---------|
+| `glific_contacts` | `glific.contacts` | Incremental | Contacts extract; dedupe by phone |
+| `glific_messages` | `glific.messages` | Incremental | Messages extract by `contact_phone`, `flow_label`, `inserted_at` |
+
+### Silver — cleaned & transformed
+
+Business logic, joins, filters. Dataset: `Activity_Funnel_silver`
+
+| Model | Depends on | Purpose |
+|-------|------------|---------|
+| `student_contacts` | `glific_contacts` | TLM25 students with school name (test phones excluded) |
+| `total_activities` | `glific_messages` | Activity flow labels for Jul 2025–Jun 2026 |
+| `activity_catalog` | `total_activities` | Sent activities only (no access/submission/complete) |
+| `activity` | `activity_catalog` | Total activities sent per student |
+| `student_access` | `student_contacts`, `total_activities` | Activities accessed per student |
+| `student_access_rates` | `student_access`, `activity` | Per-student access rate |
+
+### Gold — analytics & reporting
+
+Final metrics for dashboards. Dataset: `Activity_Funnel_gold`
+
+| Model | Depends on | Purpose |
+|-------|------------|---------|
+| `school_access_rates` | `student_access_rates` | School-level rollup; top 50 schools by access rate |
+
+### Layer flow
+
+```mermaid
+flowchart LR
+    subgraph sources [Sources]
+        C[glific.contacts]
+        M[glific.messages]
+    end
+
+    subgraph bronze [Bronze]
+        GC[glific_contacts]
+        GM[glific_messages]
+    end
+
+    subgraph silver [Silver]
+        SC[student_contacts]
+        TA[total_activities]
+        AC[activity_catalog]
+        A[activity]
+        SA[student_access]
+        SAR[student_access_rates]
+    end
+
+    subgraph gold [Gold]
+        SAR2[school_access_rates]
+    end
+
+    C --> GC
+    M --> GM
+    GC --> SC
+    GM --> TA
+    TA --> AC
+    AC --> A
+    SC --> SA
+    TA --> SA
+    SA --> SAR
+    A --> SAR
+    SAR --> SAR2
 ```
 
 Validate locally (no BigQuery):
 
 ```bash
 dbt compile --select tag:activity_funnel
+dbt compile --select tag:bronze
+dbt compile --select tag:silver
+dbt compile --select tag:gold
 ```
 
 Run in BigQuery (approved warehouse runs only):
@@ -92,7 +147,13 @@ Run in BigQuery (approved warehouse runs only):
 dbt build --select tag:activity_funnel
 ```
 
-This creates/updates all Activity Funnel tables in the `Activity_Funnel` dataset family.
+Warehouse output:
+
+| Layer | BigQuery dataset |
+|-------|------------------|
+| Bronze | `Activity_Funnel_bronze` |
+| Silver | `Activity_Funnel_silver` |
+| Gold | `Activity_Funnel_gold` |
 
 ## Weekly sync (GitHub Actions)
 
@@ -100,10 +161,9 @@ The pipeline runs automatically every **Sunday at 12:05 AM IST** (Saturday 18:35
 
 It runs:
 
-1. `dbt deps`
-2. `dbt build --select tag:activity_funnel` (all Activity Funnel models + tests)
+1. `dbt build --select tag:activity_funnel` (all Activity Funnel models + tests)
 
-Output lands in BigQuery dataset **`Activity_Funnel`** (prod) and **`Activity_Funnel_intermediate`** (intermediate models).
+Output lands in BigQuery datasets **`Activity_Funnel_bronze`**, **`Activity_Funnel_silver`**, and **`Activity_Funnel_gold`**.
 
 ### One-time GitHub setup
 
@@ -137,13 +197,13 @@ Remote: https://github.com/vishal-patil-23/tap
 
 ```
 tap/
-├── dbt_project.yml          # Project config (profile: tap, tag: activity_funnel)
+├── dbt_project.yml
 ├── models/
 │   ├── staging/glific-bigquery/   # Source definitions
-│   ├── intermediate/glific/       # Transformation models
-│   └── prod/                      # Final reporting tables
-├── tests/
-└── packages.yml
+│   ├── bronze/
+│   ├── silver/
+│   └── gold/
+└── requirements.txt
 ```
 
-Warehouse tables use dbt default schema naming: prod models in `Activity_Funnel`, intermediate models in `Activity_Funnel_intermediate`.
+Warehouse tables map to medallion datasets: `Activity_Funnel_bronze`, `Activity_Funnel_silver`, `Activity_Funnel_gold`.
