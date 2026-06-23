@@ -48,7 +48,6 @@ flowchart LR
     SAR --> SAR2
 ```
 
-
 ## Project structure
 
 ```
