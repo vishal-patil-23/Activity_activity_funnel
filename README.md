@@ -93,7 +93,7 @@ dbt test --select school_access_rates
 
 ## Weekly sync (GitHub Actions)
 
-The pipeline runs automatically every **Monday at 09:00 IST** (03:30 UTC) via `.github/workflows/weekly-sync.yml`.
+The pipeline runs automatically every **Sunday at 12:05 AM IST** (Saturday 18:35 UTC) via `.github/workflows/weekly-sync.yml`.
 
 It runs:
 
