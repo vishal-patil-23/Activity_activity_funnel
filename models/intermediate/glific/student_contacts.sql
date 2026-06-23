@@ -5,11 +5,11 @@
 
 SELECT
     phone,
-    school_name
+    JSON_VALUE(raw_fields, '$.school.value') AS school_name
 FROM
     {{ ref('glific_contacts') }}
 WHERE
-    school_name IS NOT NULL
+    JSON_VALUE(raw_fields, '$.school.value') IS NOT NULL
     AND group_labels LIKE '%TLM25_AllStudents%'
     AND group_labels NOT LIKE '%TAP Team%'
     AND group_labels NOT LIKE '%TLM25_TAP%'
